@@ -26,7 +26,10 @@ class OBJ:
                 self.normals.append(v)
             elif values[0] == 'vt':
                 self.texcoords.append(list(map(float, values[1:3])))
-
+            elif values[0] in ('usemtl', 'usemat'):
+                material = values[1]
+            elif values[0] == 'mtllib':
+                self.mtl = MTL(values[1])
             elif values[0] == 'f':
                 face = []
                 texcoords = []
@@ -36,8 +39,36 @@ class OBJ:
                     face.append(int(w[0]))
                     if len(w) >= 2 and len(w[1]) > 0:
                         texcoords.append(int(w[1]))
+                    else:
+                        texcoords.append(0)
+                    if len(w) >= 3 and len(w[2]) > 0:
+                        norms.append(int(w[2]))
+                    else:
+                        norms.append(0)
+                self.faces.append((face, norms, texcoords, material))
 
         self.gl_list = glGenLists(1)
         glNewList(self.gl_list, GL_COMPILE)
         glEnable(GL_TEXTURE_2D)
         glFrontFace(GL_CCW)
+        for face in self.faces:
+            vertices, normals, texture_coords, material = face
+
+            mtl = self.mtl[material]
+            if 'texture_Kd' in mtl:
+                # use diffuse texmap
+                glBindTexture(GL_TEXTURE_2D, mtl['texture_Kd'])
+            else:
+                # just use diffuse colour
+                glColor(*mtl['Kd'])
+
+            glBegin(GL_POLYGON)
+            for i in range(len(vertices)):
+                if normals[i] > 0:
+                    glNormal3fv(self.normals[normals[i] - 1])
+                if texture_coords[i] > 0:
+                    glTexCoord2fv(self.texcoords[texture_coords[i] - 1])
+                glVertex3fv(self.vertices[vertices[i] - 1])
+            glEnd()
+        glDisable(GL_TEXTURE_2D)
+        glEndList()
